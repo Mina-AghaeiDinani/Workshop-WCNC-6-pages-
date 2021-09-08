@@ -1,0 +1,353 @@
+\documentclass[conference]{IEEEtran}
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+\input{common/packages}
+%\input{common/package_config}
+%\input{common/new_commands}
+\pagestyle{plain}
+\DeclareMathOperator*{\argmin}{arg\,min}
+%figure
+
+
+% \makeatletter
+% \def\Cline#1#2{\@Cline#1#2\@nil}
+% \def\@Cline#1-#2#3\@nil{%
+%   \omit
+%   \@multicnt#1%
+%   \advance\@multispan\m@ne
+%   \ifnum\@multicnt=\@ne\@firstofone{&\omit}\fi
+%   \@multicnt#2%
+%   \advance\@multicnt-#1%
+%   \advance\@multispan\@ne
+%   \leaders\hrule\@height#3\hfill
+%   \cr}
+% \makeatother
+
+\begin{document}
+%
+% paper title
+% Titles are generally capitalized except for words such as a, an, and, as,
+% at, but, by, for, in, nor, of, on, or, the, to and up, which are usually
+% not capitalized unless they are the first or last word of the title.
+% Linebreaks \\ can be used within to get better formatting as desired.
+% Do not put math or special symbols in the title.
+
+%Feasibility of Floating Content modeling through a variation of Random Waypoint
+%\title{Gossip Learning: Personalized Models \\
+%for Vehicle Trajectory Prediction \vspace{-0.3in}}
+\title{Gossip Learning of Personalized Models \\
+for Vehicle Trajectory Prediction \vspace{-0.3in}}
+
+\vspace{-65pt}
+% author names and affiliations
+% use a multiple column layout for up to three different
+% affiliations
+\author{\IEEEauthorblockN{Mina Aghaei Dinani,\\Adrian Holzer}
+\IEEEauthorblockA{University of Neuchatel,\\ Switzerland\\name.surname@unine.ch}
+\and
+\IEEEauthorblockN{Hung Nguyen}
+\IEEEauthorblockA{The University of Adelaide,\\ Australia\\hung.nguyen@adelaide.edu.au}
+\and
+\IEEEauthorblockN{Marco Ajmone Marsan}
+\IEEEauthorblockA{Politecnico di Torino, Italy and\\ Institute IMDEA Networks, Spain\\ajmone@polito.it}
+\and
+\IEEEauthorblockN{Gianluca Rizzo}
+\IEEEauthorblockA{HES-SO Valais, Switzerland, and\\
+University of Foggia, Italy
+\\gianluca.rizzo@hevs.ch}
+}
+
+
+% make the title area
+\maketitle
+
+% creates the second title. It will be ignored for other modes.
+%\IEEEpeerreviewmaketitle
+\input{00_abstract}
+
+\vspace{-15pt}
+\input{01_Intro}
+\vspace{-0.1in}
+\section{System model}
+\label{sec:System model}
+We consider a set of wireless nodes, moving on a finite region of the plane according to an arbitrary \textit{stationary} mobility model. We assume nodes know exactly their position at any point in time. Nodes communicate among them using a wireless technology (e.g. WiFi, DSLR, Cellular D2D, among others). We say that two nodes are \textit{in contact} when they are able to exchange information directly.\\
+We assume that the given region of the plane is partitioned into \textit{cells}. Location, size and shape of the region, as well as of each cell are typically determined by the specific application scenario requiring trajectory prediction. For instance, in a setup where vehicles offload part of their computing tasks to a MEC service, a cell of our system may correspond to the coverage area of the roadside unit(s) to which a specific MEC server is associated. The choice of the region instead depends on the spatial range of the specific service requiring trajectory predictions.\\
+%\com{the choice of size and shape of the region, as well as of each cell, is entirely application driven. here w ejust make simplifying assumption for the sake of presentation clarity.}
+In addition to these cells, we define an \textit{outside cell}, consisting in the area of the plane lying out of the given region. 
+Without loss of generality, let us assume time to be divided into slots, and let $\Delta$ be the slot duration.
+Let $v$ be the unique identifier of a vehicle in the given scenario. Starting from the slot at which the $v-th$ vehicle enters the given region (which we denote as slot $1$),  each vehicle samples its position in space at each time slot. If $t$ is the label of the $t-th$ slot since ingress time, with $(x_t,y_t)$ we denote the vehicle position at the beginning of that slot. The resulting time series $\{( x_t,y_t)\}_{t=1,...,t_0}$
+%$[(t_1, x_{t_1}(k),y_{t_1}(k)),(x_{t_2}(k),y_{t_2}(k)),..., (x_{t_l}(k),y_{t_l}(k))]$
+%$$x_{k,1},x_{k,2},..., x_{k,i}$$
+%where each entry is a 2-tuple representing the coordinates in a Cartesian plane,
+constitutes the \textit{local dataset} of the vehicle up to the $t_0-th$ slot from node ingress.\\
+As explained, we consider a scenario in which at any slot each user (vehicle) tries to predict its own location $h$ slots ahead in the future. %\textcolor{red}{Again talking about outside cell while we have not considered such a cell}
+The outside cell is used to predict whether a node will get out of the given region in $h$ slots. In order to avoid trivial prediction tasks (due to e.g. regular mobility patterns of vehicles) in what follows we adopt a \textit{clean-slate model}, by which we assume that nodes entering the given region possess an empty local dataset. This models the worst-case condition in which vehicles in the scenario are new to the area considered, and thus they cannot rely on data collected before entering the given region for elaborating a prediction of their trajectory. Though far from ordinary operating conditions in a realistic setting, the clean-slate assumption allows a first conservative assessment of our approach, in a way which is independent from any context-dependent assumption on the composition or the size of the initial dataset. As in machine learning techniques more data imply (at least the opportunity of) better performance for the model trained on that data, results obtained in a clean slate scenario may be seen as lower bounds on the actual performance achievable with our approach in a realistic scenario.
+Of course, note that our approach can be easily extended and adapted to the case in which such assumption does not hold, though in that case the performance (as well as the necessary adaptations) would be a function of the specific assumptions made on the composition of the initial dataset of each node. 
+\vspace{-5pt}
+%\section{Gossip Learning (GL) algorithms}
+\section{A distributed architecture for Gossip Learning}
+\label{sec:A distributed architecture for Gossip Learning}
+%The fundamental problem addressed in this work is online trajectory prediction in a VANET by using GL.
+%As explained, we consider a scenario in which a Mobile Network Operator (MNO) regularly receives predictions of vehicle trajectory in order to implement proactive strategies for resource allocation, e.g., for the allocation of storage and computing in the appropriate locations, to efficiently implement MEC services. 
+%\\
+In this section, we outline the architecture of our new GL protocol, whose goal is to endow each node in the scenario with a machine learning based model capable of accurately predicting its trajectory. 
+\vspace{-0.1in}
+\subsection{A LSTM architecture for trajectory prediction}
+In order to implement our learning architecture, we assume that each nodes employs a Long Short Term Memory (LSTM) network, a special kind of Recurrent Neural Network (RNN) already proposed in the literature to predict vehicle trajectories \cite{altche2017lstm}. For the task of time series forecasting, when a sequence of input and output multi-variant data is available \cite{kim2017probabilistic}\cite{ondruvska2016deep}, encoder-decoder LSTM has been shown to outperform other approaches for motion prediction, such as Kalman filtering \cite{carvalho2014stochastic} or Support Vector Machines \cite{kumar2013learning}, as their lack of depth does not allow satisfactory prediction performance.\\
+Thus, we assume that each node that traverses the considered region uses his local dataset to train an encoder-decoder LSTM model. Once the model is trained, at every time slot each node feeds the LSTM model with the last $\alpha$ samples of the time serie representing the vehicle's own trajectory in the last $\alpha$ time slots, and it outputs a prediction on where the node will be in $h$ time slots in the future.\\
+The detailed architecture of the encoder-decoder LSTM model is as follows. This model is the concatenation of two LSTM layers (encoder and decoder), each with 50 neurons. The LSTM encoder accepts as input a time series $\{( x_t,y_t)\}_{t=t_1,...,t_1+\alpha}$ of size $\alpha$ by $2$%\textcolor{red}{why by 2?}
+, representing vehicle trajectories over $\alpha$ consecutive time slots. 
+%\textcolor{blue}{ it is wrong,  t is not an input for our LSTM model, only we have in order x, and y }
+%, i.e., a sequence $[(x_{t_1}(k),y_{t_1}(k)),(x_{t_2}(k),y_{t_2}(k)),..., (x_{t_l}(k),y_{t_l}(k))]$
+%of $l$ coordinates in a Cartesian plane. 
+The output of the first LSTM layer (encoder) is a fixed-length vector which captures the temporal structure of the past trajectory. The second LSTM layer (decoder)  maps the vector representation back to a variable-length target sequence. The target sequence is the \textit{cell trajectory} 
+$c_1,..., c_h$ of length $h$, i.e. a sequence of $h$ cell labels describing the cell in which the vehicle is predicted to be, from time slot $t_1+\alpha+1$ up to time slot $t_1+\alpha+h$.  
+%\com{the cell trajectory is fed to the second LSTM, which does what???It is useless, as we already have a prediction?}.
+%The output of the decoder  LSTM layer is sent to a softmax output layer with one neuron per cell. The softmax function outputs a matrix of size equal to the number of cells, which assigns to each cell a value equal to the estimated probability for the node of being in that cell $h$ slots ahead in the future. Finally, the cell with higher probability is selected as output of the prediction process.\\
+%\com{here a small figure could help, showin the two layers and the softmax}\\
+The resulting LSTM network is trained over a sequence of epochs, i.e. of learning iterations performed over the entire dataset. In each epoch, a node trains once the local model instance using its local dataset, and it updates the model parameters. We adopt a mini-batch Gradient Descent training approach, in which the training during one epoch is  partitioned in two or more batches of size $32$. Finally, we have adopted the Adam optimizer~\cite{kingma2014adam} in our model because of its computational efficiency and simplicity, as it requires little memory, and is well suited for problems with many parameters. It is also appropriate to cope with non-stationary objectives.
+Please note that the number of neurons, the batch size, the number of input time steps as well as the other hyperparameters of our LSTM network and of the training process have been tuned through extensive simulations and testing.
+% To this end, starting from its local dataset and the GL model instances it receives  from other vehicles, each user updates its local model instance, which progressively incorporates global knowledge.
+% In general, the outcome of this GL approach is a different model instance for each node.
+\vspace{-0.1in}
+\subsection{A framework for collaborative training in dynamic settings}
+In this section we describe a decentralized, collaborative algorithm for training the LSTM network, in a way which maximizes the accuracy of the prediction for each user. 
+An outline of our proposed strategy for decentralized GL is presented in Algorithm \ref{alg:decetralizedLaerning}.\\
+%\textcolor{red}{ instead of algorithm 1 it is written fig1}.\\
+Our algorithm is structured as follows. We assume the time spent by each node in the region to be divided into two stages.\\
+\textbf{Initialization stage}. It starts from the time slot in which the node enters the considered area (or from the beginning of the scheme if the node is already present in the given region at that point in time), and it lasts $V$ slots. During this stage, the node does not possess yet a sufficiently large dataset to train its local model. Thus the node does not perform any prediction, but it collects data and it builds its local dataset.\\
+%
+\begin{algorithm} [t!]
+\caption{ Decentralized GL algorithm.\\ 
+%Slot 1 is the slot at which node $x$ enters the region, or the first slot of the scheme if the node is present in the region at the beginning of the scheme. 
+$K^v_j$ is the set of nodes in their exploitation phase which come in contact with node $v$ during the $j-th$ round.}
+\label{alg:decetralizedLaerning}
+\small
+\begin{algorithmic}
+\For {every node v}
+\For{slot $1$ to $V$} \Comment{\textbf{Initialization stage}}
+\State Update local dataset
+\EndFor
+%\State \textbf{Server execute:}
+%\State Do nothing until data for validation set collected
+\\  Train the initial model instance $w_0^v$ over local dataset.
+\State $w_1^v=$\textsc{clientUpdate($w_0^v$)} 
+%$w_1$
+%\vspace{0.1in}
+\For{Each round $j$} \Comment{\textbf{Exploitation stage}}
+\For {Every node $k\in K^v_j$ } 
+%\If {k is in exploitation phase}
+\State Send model instance $w_j^v$ 
+\State Receive model update $w_j^{v,k}$ 
+\State Receive model $w_j^k$\\
+\Comment{Train model $w_j^k$ on local dataset}
+\State $w_j^{k,v}=$\textsc{clientUpdate($w_j^{k}$)}
+ %update  $ w_{t+1}^k \gets \textsc{clientUpdate($k, w_t$)}$
+\State Send model update $w_j^{k,v}$ to node $k$ 
+%\EndIf
+\EndFor\\
+%\If {Round j has passed}\\
+\Comment{Merge all received model updates}
+\State $w_j^v \gets$\textsc{mergeModels($\{w_j^{v,k}\}_{k\in K^v_j}$)} 
+\State Update local dataset
+\State{Train $w_j^v$ over local dataset.}
+%\EndIf
+\EndFor
+\EndFor
+%\vspace{0.5in}
+\end{algorithmic}
+\normalsize
+\end{algorithm}
+%\vspace{-0.2in}
+\begin{algorithm}
+\small
+\begin{algorithmic}
+\Function{clientUpdate}{$w_j^v$} \Comment{Run on client k}
+\State Split local dataset into $B$ batches
+%\For{Epoch $i\in 1,...,h$} \com{n of epochs equal to n of slots of prediction ahead???}
+\State Let $w\gets w_j^v$
+\For{batch $b\in 1,...,B$}
+\State $w\gets w - \eta\bigtriangledown(w;b)$\\
+\Comment{$\eta$ is the learning rate}
+%\com{what is $\bigtriangledown(w;b)$ ? }
+%\EndFor
+\EndFor
+\State return $w^{v,k}_j \gets w$ 
+\EndFunction
+\end{algorithmic}
+\normalsize
+\end{algorithm}
+%%%%%%%%%%%%%%%%%%%%%
+%
+% \\ $B$ is the local mini-batch size; $\eta$ is the learning rate; $\rho_k$ denotes the local dataset for the $k-th$ node, $w_{t+1}$ is the meta model of the server at round $t$, and $w_{t+1}^k$ is the updated model by client $k$ at round $t$.
+Finally, at the end of the initialization stage, each node initializes the model by training it on its local dataset. \\
+%Then it trains the resulting initial model instance (which we denote as $w_0^x$) using its local dataset.\\ 
+\textbf{Exploitation stage}. This second stage starts at slot $V+1$, and terminates when the node exits the given region.\\
+%\footnote{\com{Introduce $T_x$. Do we baptize this "given region"? And why don't we spend 2 words on how should we choose such a region?}}.\\
+Three are the main activities of each node in this stage. Firstly, the node keeps expanding its local dataset, by adding in real time data about its current trajectory. In the exploitation stage, the \textit{validation set}, which is used to evaluate the performance of the training process, is constituted by the last $V$ samples of the trajectory of each node.\\
+Moreover, in the exploitation phase each nodes uses its LSTM model to issue a prediction about the cell in which it will be in $h$ slots.\\%\footnote{\com{What happens when the node is close to exiting the region? why don't we introduce an "outside cell" for that? LET'S DO IT.}}
+The third and foremost activity of the exploitation stage is the training of the local model of the node, through a collaborative training, % by a combination of local training over the local dataset of the node,
+supported by all the nodes with which the given node comes in contact. The goal is to improve the accuracy of the local model over that which can be achieved by relying exclusively on local training. To this end, from the beginning of this stage, each node partitions time into \textit{rounds}, of duration equal to one or more slots.\\
+From the beginning of a round, and for all its duration, the given node (which we denote as \textit{server node}) sends the coefficients of its local instance of the LSTM model to all nodes which are within its transmission range (which we denote as \textit{client nodes}). Every client node that receives the model instance trains it using a subset of its own dataset.\\ 
+ %Specifically, Depending on the application scenario, two alternatives are possible: (i) the model instance is trained on all available data, or (ii) only on the most recent observations. 
+ %This leads to the use of either an expanding or a sliding window of data for training. 
+% ($w_{t+1}^k$ is the updated model by neighbor $k$ at round t)
+ %(denoted by $w_{t+1}$)
+  Once each client node has completed the training of the received instance, it sends it back to the server node if it is still in range and if the round has not passed, and discards it otherwise. At the end of the round, and similarly to traditional Federated Learning, the server node combines the model instances received from clients during the given round, to build a meta-model which is used for issuing trajectory predictions, and for initiating a new training round. %For each node, the maximum number of rounds depends on the time spent by the node in the area.
+ Note that each node has control of its data, and never shares its dataset with others. Instead, nodes share their model instances, thus providing support for protection of data confidentiality. Note also that the frequency of the training of the meta-model over the local dataset is a parameter which can be tuned and adapted to the specific setup considered. In particular, it depends on the duration of a round (in terms of number of slots), and it can be performed at the end of every round, or every $n$ rounds.\\
+We observe that the scheme we just described bears a close resemblance to classical FL algorithms. However, differently than classical FL, every node in the exploitation stage is at the same time playing the role of the \textit{server} (or coordinator) for his own personal learning task, for which it is building its own local model, and of client node for other nodes' learning tasks. That is, each node in the exploitation stage (and thus with a substantial dataset) is available for training the models of all other nodes which come in contact. In this, they play a similar role as client nodes in FL, receiving a model instance from another node, and sending back to it an updated version of the received model instance. Differently than FL however, all client nodes participating in the training process in a round are all those nodes which the server node meets during the round. Moreover, each client is not required to be in contact with the server node for the whole round, as in FL. Instead, it may initiate the exchange with the server node at any time within the round, provided that the contact duration is long enough to allow for model exchange and training.\\ 
+%  In our scheme nodes can take the role of \textit{client} and/or \textit{server}.  That is, a node is a client when it receives a model instance from another node (that is playing the role of the server), it updates the received model instance using its local dataset, and sends back to the server the updated model instance. The server node, as in classical FL, coordinates the steps of the distributed training process, and it combines the updated model instances received by neighbors to produce a federated model. Specifically, during the exploitation stage, each node is a server \\
+%Algorithm \ref{alg:decetralizedLaerning} describes the collaborative learning algorithm in more details, 
+Among the many hyperparameters of our scheme, a key role is played by the total number of epochs for each training step.
+Our scheme adopts two different values for this parameter. %\textcolor{red}{what does it mean?} 
+When acting as client, and training other nodes' models, we chose a maximum number of epochs equal to one. Indeed, though our scheme differs in important ways from traditional, centralized FL, they both share the same client-coordinator structure, for which it has been shown \cite{mcmahan2017communication} that choosing a single epoch maximizes accuracy while minimizing training time.\\%\footnote{\com{Ideally this should be verified experimentally to actually hold also in our scheme. NOT DONE, BUT SHOULD HAVE BEEN DONE.}}\\
+When a node trains its local model on its own local dataset instead, the total number of epochs is chosen in such a way as to avoid overfitting while maximizing accuracy.\\
+%\footnote{\com{complete here! Does the accuracy always improve when increasing epoch number, for LSTM models? I guess here we just have to define a number which is "enough", or just say that we chose it to be enough for our learning rate (I guess it depends on it too), and our network. And in the num section give some numbers for this parameter, for the scenario chosen.}}
+A key aspect of our GL approach is represented by the strategy used by each server node to combine the model instances received by client nodes in order to produce an updated version of its local model instance (also denoted as \textit{meta-model}).
+In what follows, we propose three different approaches to merge model instances received from neighbours and create a local model instance by using collaborative learning techniques. The performance of the three approaches will be then discussed in the numerical evaluation section.\\
+It is important to stress that, in the considered setting, the strategies for the merging of model instances are the key factor influencing the system performance, due to the continuously changing set of neighbour nodes. For this reason, in this paper we concentrate on such strategies and on the corresponding model instance weighting approaches. 
+%
+% \State $S_t \gets$  (Get list of clients within transmission range)
+% \State Send($k,w_t$)
+% \Comment{\textbf{TX} to neighbours}
+% \For{each $k \in S_t$ }
+% \State  $ w_{t+1}^k \gets \textsc{clientUpdate($k, w_t$)}$
+% \Comment{\textbf{RX} from neighbours}
+% \EndFor
+% \State $ w_{t+1} \gets $ \textsc{mergeModels(.)}
+% %\State Using $ w_{t+1}$ to predict next x seconds trajectory
+% \State Update validation set
+% \EndFor
+% \Function{clientUpdate}{$k, w_t$}
+% \Comment{Run on client k}
+% \State $\beta \gets $ split $\rho_k$ into batch of size $B$
+% \For{each local epoch $i$ from 1 to $h$}
+% \For{ $b \in \beta$}
+% \State $w \gets w - \eta\bigtriangledown(w;b)$
+% \EndFor
+% \EndFor
+% \State return $w$ to the server
+% \EndFunction
+% \end{algorithmic}
+% \normalsize
+% \end{algorithm}
+\vspace{-0.1in}
+\subsection{Decentralized  Averaging (DFed Avg)}
+
+The \textit{DFed Avg} approach is based on the way of combining models which is most frequently used in the literature for FL algorithms.% This will be considered as the baseline approach in the numerical evaluation section.%\footnote{\com{too formal? do we need really to express merging in this way?}}
+%
+\label{sec:DFedAvg}
+\begin{algorithm}[!htb]
+\small
+\caption{DFedAvg\\
+$n_k$ is the number of samples in the local database of client $k$ which have been used for training}
+\begin{algorithmic}
+\Function{mergeModels}{$\{w^{v,k}\}_k$, $n_k$}
+\label{mergFedAvg}
+\State $N \gets \sum\limits_{k\in K^{v}_j}n_k$
+\State $ w^{v} \gets  \sum\limits_{k\in K^{v}_j} \frac{n_k}{N}  w^{v,k} $
+\State Return $w^{v}$
+\EndFunction
+\end{algorithmic}
+\normalsize
+\end{algorithm}
+%$n_{k,i}$ is the size of the local dataset of the $k-th$ vehicle at the $i-th$ time interval.
+   % \item $N$ is the total number of samples of all clients involved in the training phase
+    %\item $K$ is the number of clients involved in training phase
+%\end{itemize}
+With this approach, $w^{v}$ is computed through a weighted sum over all clients model instances, in which the contribution of each client node is weighted by the proportion of the number of its samples involved in the training phase ($n_k$) over the total number of samples in the training phase ($N$). This approach gives more weight to a model instance which has a larger number of samples. The underlying idea is that to a larger amount of data points used for training it corresponds a more accurate model. %\footnote{\com{in the num section we shopw how this palys out....comment (possibly in the num section) why this could be true? and why it could not be the case, for our GL approach.}}
+\vspace{-0.1in}
+\subsection{Decentralized  Powerloss (DFed Pow)} 
+
+The \textit{DFed Pow} approach weights each neighbor contribution to the meta-model according to a notion of similarity (in terms of roads and regions of the city covered) among the datasets of the server and of the client nodes. Specifically, the server node uses its local validation set to evaluate the loss value $l_k$ of each of the updates of the model received by client nodes. As a loss function, we considered the well known categorical cross-entropy~\cite{cox1958regression}, which compares the probability vector given as the output of the model with a one-hot encoded vector representing the true class, and through a logarithmic formula computes the amount of loss. The result is a loss value which increases as the predicted probability diverges from the actual label.%, whereas a perfect model would have a loss value of zero. 
+In computing the meta-model, each client contribution is proportional to the inverse of a function which grows exponentially with loss. Specifically, to the model update of each user $k$ we assigned a weight given by $\frac{10^{-l_k}}{\sum_{k'} 10^{-l_{k'}}}$, where the normalization term at the denominator is a sum over all clients which returned a model in the given round. %The resulting algorithm is the following.
+%
+\label{sec:DFedPow}
+\begin{algorithm}[!h]
+\small
+\caption{DFed Pow\\
+$l_k$ is the loss of model update from node $k$ (i.e. of $w^{v,k}$) over validation set of node $v$. }
+\begin{algorithmic}
+\Function{mergeModels}{$\{w^{v,k}\}_k$}
+\label{mergFedPOW}
+\For{every node $k\in K^{v}_j$ }
+\State Compute $l_k$  
+%\State $p_k \gets 10^{-l_k}$
+\State $P \gets \sum\limits_{k\in K^{v}_j}10^{-l_k}$
+\State $ w^v \gets  \sum\limits_{k\in K^{v}_j} \frac{10^{-l_k}}{P}  w^{v,k} $
+\EndFor
+\State Return $w^{v}$
+\EndFunction
+\end{algorithmic}
+\normalsize
+\end{algorithm}
+%
+% In the above algorithm,
+% \begin{itemize}
+% %    \item $l_k$ is the evaluated loss of the updated model of node $k$ on the local validation set of the server
+%     % \item $p_k$ = $10^{-l_k}$
+%     % \item $P$ is the summation of all $p_k$
+% \end{itemize}
+%
+\vspace{-0.1in}
+\subsection{Decentralized  Minimum Loss (DFed MinLoss)} 
+Finally, in the \textit{DFed MinLoss} approach, the server selects among the received model updates the one with the lowest loss value (computed as in DFed Pow), and it takes it as its local model instance. This approach originates from the observation that in DFed Pow the meta-model does not always perform better than the single model updates which compose it.
+
+\begin{algorithm}[!htb]
+\caption{DFedMinLoss }
+\begin{algorithmic}
+\small
+\Function{mergeModels}{$\{w^{v,k}\}_k$}
+\label{mergFedBest}
+\For{every node $k\in K^{v}_j$ }
+\State Compute $l_k$  
+%\State $p_k \gets 10^{-l_k}$
+\EndFor
+\State Compute $k'=\argmin\limits_{k\in K^{v}_j} l_k$
+\State Return $w^{v,k'}$
+\EndFunction
+\end{algorithmic}
+\normalsize
+\end{algorithm}
+%
+%models which have been combined in order to obtain it. %The accuracy of the three algorithms is evaluated in the next section.
+\input{numerical.tex}
+\input{conclusions.tex}
+%%%%%%%%%%%%%%%%%%%%%%%%%
+% trigger a \newpage just before the given reference
+% number - used to balance the columns on the last page
+% adjust value as needed - may need to be readjusted if
+% the document is modified later
+%\IEEEtriggeratref{8}
+% The "triggered" command can be changed if desired:
+%\IEEEtriggercmd{\enlargethispage{-5in}}
+
+% references section
+
+% can use a bibliography generated by BibTeX as a .bbl file
+% BibTeX documentation can be easily obtained at:
+% http://mirror.ctan.org/biblio/bibtex/contrib/doc/
+% The IEEEtran BibTeX style support page is at:
+% http://www.michaelshell.org/tex/ieeetran/bibtex/
+%\bibliographystyle{IEEEtran}
+% argument is your BibTeX string definitions and bibliography database(s)
+%\bibliography{IEEEabrv,../bib/paper}
+%
+% <OR> manually copy in the resultant .bbl file
+% set second argument of \begin to the number of references
+% (used to reserve space for the reference number labels box)
+
+
+
+\bibliographystyle{IEEEtran}
+\vspace{-12pt}
+\bibliography{IEEEabrv,Bibliography}
+
+\cleardoublepage
+
+
+% that's all folks
+\end{document}
+
+
